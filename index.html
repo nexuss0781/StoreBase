@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <title>Google Play — Apps & Explore</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #121212;
+      --surface: #1f1f1f;
+      --surface-2: #242426;
+      --text: #e8eaed;
+      --muted: #bdc1c6;
+      --dim: #9aa0a6;
+      --blue: #a8c7fa;
+      --active: #006b8f;
+      --bar: #202124;
+      font-family: Roboto, "Arial", sans-serif;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; background: var(--bg); }
+    body { overflow: hidden; color: var(--text); -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; color: inherit; }
+    button { border: 0; }
+    .phone { width: min(100vw, 520px); height: 100vh; height: 100dvh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); position: relative; }
+    .store-header { height: 52px; flex: 0 0 52px; display: flex; align-items: center; padding: 0 28px 0 21px; }
+    .apps-head { width: 100%; display: flex; align-items: center; padding-left: 3.5px; transform: translateY(-1px); }
+    .play-logo { display: block; width: 25px; height: 29px; flex: 0 0 auto; }
+    .header-spacer { flex: 1; }
+    .bell { width: 31px; height: 34px; margin-right: 18px; position: relative; display: grid; place-items: center; background: transparent; }
+    .bell svg { width: 22px; height: 25px; }
+    .badge { position: absolute; top: 0; right: -1px; width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%; background: #f6bfc3; color: #5d2428; font-size: 10px; font-weight: 700; }
+    .avatar { width: 29px; height: 29px; flex: 0 0 29px; display: grid; place-items: center; border-radius: 50%; background: #a142c6; color: #fff; font-size: 15px; font-weight: 500; }
+    .explore-head { display: none; align-items: center; gap: 16px; width: 100%; transform: translateY(-1.5px); }
+    .search-box { height: 41px; min-width: 0; flex: 1; display: flex; align-items: center; gap: 13px; padding: 0 17px; border-radius: 24px; background: #292a2d; color: var(--muted); }
+    .search-box input { width: 100%; min-width: 0; padding: 0; border: 0; outline: 0; background: transparent; font-size: 16px; color: var(--text); }
+    .search-box input::placeholder { color: #c4c7cc; opacity: 1; }
+    .search-box svg { width: 18px; height: 18px; flex: 0 0 auto; }
+    .voice { width: 18px !important; height: 20px !important; }
+    .category-strip { height: 60px; flex: 0 0 60px; display: flex; align-items: flex-start; gap: 4px; padding: 5px 21px 0; overflow-x: auto; scrollbar-width: none; }
+    .category-strip::-webkit-scrollbar { display: none; }
+    .category-chip { height: 36px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; padding: 0 12px; border-radius: 22px; background: #202124; color: #e8eaed; white-space: nowrap; font-size: 14px; font-weight: 500; letter-spacing: .02px; }
+    .category-chip:nth-child(1) { width: 107.5px; }
+    .category-chip:nth-child(2) { width: 96px; }
+    .category-chip:nth-child(3) { width: 106.5px; }
+    .category-chip svg { width: 14px; height: 14px; color: var(--blue); }
+    .feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+    .feed::-webkit-scrollbar { display: none; }
+    .apps-feed { display: block; }
+    .apps-content { padding: 0 21px 24px; }
+    .explore-feed { display: block; padding: 8.5px 21px 18px; }
+    .featured-card { height: 239px; overflow: hidden; border-radius: 16px; background: #1e1e1e; }
+    .featured-art { height: 130px; position: relative; overflow: hidden; background: #041544; }
+    .featured-art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 48%; }
+    .featured-art::after { content: ""; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent 0%, rgba(18,18,18,.4) 52%, #1e1e1e 100%); }
+    .expires { position: absolute; z-index: 1; left: 7px; top: 7px; height: 23px; display: flex; align-items: center; padding: 0 9px; border-radius: 15px; color: #3c4043; background: #f1f3f4; font-size: 12px; font-weight: 500; }
+    .promo-body { padding: 0 7.5px 6px 11px; }
+    .promo-title { height: 18px; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #f1f3f4; font-size: 16px; line-height: 18px; font-weight: 500; letter-spacing: -.1px; }
+    .promo-description { height: 18px; margin: 2px 0 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #e1e3e6; font-size: 12.5px; line-height: 18px; }
+    .promo-app { height: 44px; display: flex; align-items: center; gap: 14px; margin: 15px -1px 0 -3.5px; min-width: 0; }
+    .app-icon { width: 37px; height: 37px; flex: 0 0 37px; border-radius: 12px; object-fit: cover; background: #252525; }
+    .promo-name { min-width: 0; flex: 1; align-self: center; }
+    .promo-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c5c8cc; font-size: 15px; line-height: 20px; font-weight: 500; }
+    .promo-meta { margin-top: 2px; color: #bdc1c6; font-size: 12px; line-height: 17px; white-space: nowrap; }
+    .age-rating { display: inline-flex; align-items: center; height: 13px; margin: 0 10px 0 3px; padding: 0 2px; border: 1px solid #d5d7da; color: #e8eaed; font-size: 9px; line-height: 11px; font-weight: 700; }
+    .rating-star { color: var(--blue); font-size: 12px; }
+    .install-wrap { width: 68px; flex: 0 0 68px; text-align: center; align-self: center; margin-left: 2px; }
+    .install-button { width: 67px; height: 24px; border-radius: 15px; background: #c2e7ff; color: #001d35; font-size: 14px; line-height: 24px; font-weight: 500; }
+    .purchase-note { margin-top: 3px; color: #c4c7cb; font-size: 9px; line-height: 12px; white-space: nowrap; }
+    .suggested-section { margin-top: 24px; }
+    .section-heading { min-height: 24px; display: flex; align-items: center; gap: 3px; margin: 0 0 21px; white-space: nowrap; }
+    .sponsored-label { color: #e4e6e8; font-size: 12px; font-weight: 700; }
+    .heading-dot { color: #b4b8bd; font-size: 13px; }
+    .section-heading h2 { min-width: 0; overflow: hidden; margin: 0; color: #e8eaed; font-size: 17px; line-height: 22px; font-weight: 500; text-overflow: ellipsis; }
+    .more-button { width: 24px; height: 26px; margin-left: auto; display: grid; place-items: center; flex: 0 0 24px; color: #bdc1c6; background: transparent; }
+    .more-button svg { width: 18px; height: 18px; }
+    .suggestions-viewport { overflow: hidden; margin-right: -21px; }
+    .app-row { width: 100%; height: 85px; position: relative; display: flex; align-items: flex-start; gap: 14px; padding: 0 50px 0 0; }
+    .app-row::after { content: ""; position: absolute; z-index: 0; top: 0; right: -45px; width: 55px; height: 49px; border-radius: 15px; background: var(--peek); }
+    .app-row .app-icon { width: 49px; height: 49px; flex-basis: 49px; border-radius: 13px; }
+    .app-row-content { min-width: 0; flex: 1; padding-top: 2px; }
+    .app-row-title { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin: 0; color: #c5c8cc; font-size: 15px; line-height: 21px; font-weight: 500; }
+    .app-row-sub { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 2px; color: #c2c5c9; font-size: 12px; line-height: 18px; }
+    .app-row-meta { display: flex; align-items: center; gap: 10px; margin-top: 2px; color: #c6c9cd; font-size: 12px; line-height: 18px; }
+    .metric { display: inline-flex; align-items: center; gap: 2px; }
+    .metric-pill { padding: 0 6px; border-radius: 10px; background: #292a2c; }
+    .jiji-row { --peek: linear-gradient(135deg,#ff6eaf 0%,#8415c6 60%,#ffad31 100%); }
+    .numero-row { --peek: linear-gradient(145deg,#fa2f47,#db0037); }
+    .yango-row { --peek: linear-gradient(145deg,#1270d9,#1650b6); }
+    .explore-title { margin: 0 0 12px; color: #e8eaed; font-size: 14px; line-height: 19px; font-weight: 500; }
+    .you-might-like { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3.5px; }
+    .interest-card { height: 61px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 0 11px; border-radius: 10px; background: #202124; color: #e8eaed; font-size: 14px; line-height: 20px; font-weight: 500; }
+    .interest-card span { min-width: 0; }
+    .interest-card svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--blue); }
+    .explore-suggested { margin-top: 12.5px; }
+    .explore-suggested .section-heading { margin-bottom: 12px; }
+    .yango-card { min-height: 82px; display: flex; align-items: flex-start; gap: 14px; padding: 10px 10px 5px 10.5px; border-radius: 12px; background: #202124; }
+    .yango-card .app-icon { width: 49px; height: 49px; flex-basis: 49px; border-radius: 13px; }
+    .yango-info { min-width: 0; flex: 1; padding-top: 3px; }
+    .yango-info .app-row-title { font-size: 15px; line-height: 20px; }
+    .yango-info .app-row-sub { margin-top: 3px; }
+    .yango-info .app-row-meta { margin-top: 3px; gap: 12px; }
+    .explore-games { margin-top: 17.5px; }
+    .explore-games .explore-title { margin-bottom: 8.5px; }
+    .game-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px; }
+    .game-card { height: 55px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 7px; padding: 0 12px 0 11px; border-radius: 3px; background: #202124; color: #e8eaed; font-size: 13px; font-weight: 500; }
+    .game-card svg { width: 35px; height: 35px; flex: 0 0 35px; }
+    .bottom-tabs { height: 52px; flex: 0 0 52px; display: flex; align-items: stretch; background: var(--bar); }
+    .nav-tab { width: 50%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 3px; padding: 4px 0 0; color: #c4c7cb; background: transparent; font-size: 12px; line-height: 16px; font-weight: 500; }
+    .nav-icon-wrap { width: 49px; height: 28px; display: grid; place-items: center; border-radius: 20px; color: #c4c7cb; }
+    .nav-icon-wrap svg { width: 21px; height: 21px; }
+    .nav-tab[aria-selected="true"] { color: #8ab4f8; }
+    .nav-tab[aria-selected="true"] .nav-icon-wrap { background: #006b91; color: #d3e3fd; }
+    [hidden] { display: none !important; }
+    @media (max-width: 340px) {
+      .store-header { padding-right: 21px; padding-left: 21px; }
+      .category-strip { padding-right: 14px; padding-left: 14px; }
+      .category-chip { padding-right: 9px; padding-left: 9px; font-size: 13px; }
+      .apps-content { padding-right: 14px; padding-left: 14px; }
+      .explore-feed { padding-right: 14px; padding-left: 14px; }
+      .suggestions-viewport { margin-right: -14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="phone" id="phone" data-tab="apps">
+    <header class="store-header">
+      <div class="apps-head" id="apps-head">
+        <svg class="play-logo" viewBox="0 0 48 56" aria-label="Google Play"><path fill="#00d6ff" d="M4 3v50l24-25L4 3Z"/><path fill="#00e676" d="m4 3 31 17-8 8L4 3Z"/><path fill="#ffca28" d="m27 28 8-8 10 6c2 1 2 3 0 4l-10 6-8-8Z"/><path fill="#ff3d57" d="m4 53 31-17-8-8L4 53Z"/></svg>
+        <span class="header-spacer"></span>
+        <button class="bell" aria-label="Notifications">
+          <svg viewBox="0 0 24 28" fill="none"><path d="M5 19.5h14l-1.4-2.2v-5.6a5.6 5.6 0 0 0-11.2 0v5.6L5 19.5Z" stroke="#d3d6da" stroke-width="2" stroke-linejoin="round"/><path d="M9.5 22.2a2.7 2.7 0 0 0 5 0" stroke="#d3d6da" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="badge">2</span>
+        </button>
+        <span class="avatar" aria-label="Profile">T</span>
+      </div>
+      <div class="explore-head" id="explore-head">
+        <label class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="2"/><path d="m16 16 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input type="search" aria-label="Search Apps & Games" placeholder="Search Apps & Games">
+          <svg class="voice" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3" stroke="currentColor" stroke-width="2"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-3 0h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </label>
+        <span class="avatar" aria-label="Profile">T</span>
+      </div>
+    </header>
+    <div class="category-strip" id="category-strip" aria-label="App categories">
+      <button class="category-chip"><svg viewBox="0 0 20 20" fill="none"><path d="M3 10h4v7H3zM8 4h4v13H8zM13 7h4v10h-4z" stroke="currentColor" stroke-width="1.8"/></svg>Top charts</button>
+      <button class="category-chip"><svg viewBox="0 0 20 20" fill="none"><path d="m10 2 2.1 2.3 3.1-.2.7 3 2.1 2-1.5 2.7.2 3.1-3 .7-2 2.2-2.7-1.5-3.1.2-.7-3-2.2-2L4.5 8.8l-.2-3.1 3-.7 2-2.2L10 2Z" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="9.5" r="2.2" stroke="currentColor" stroke-width="1.5"/></svg>Children</button>
+      <button class="category-chip"><svg viewBox="0 0 20 20" fill="none"><path d="M3 11h5v5H3zM12 11h5v5h-5zM7 4h6l-3 5-3-5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Categories</button>
+    </div>
+    <main class="feed apps-feed" id="apps-feed" aria-label="Apps">
+      <div class="apps-content">
+        <article class="featured-card">
+          <div class="featured-art">
+            <img src="assets/duolingo-super.webp" alt="Duolingo Super owl with fireworks">
+            <span class="expires">Expires in 3 days</span>
+          </div>
+          <div class="promo-body">
+            <h1 class="promo-title">Get one month of Super Duolingo free!</h1>
+            <p class="promo-description">Supercharge your learning with Super Duolingo, the fastest way to learn.</p>
+            <div class="promo-app">
+              <img class="app-icon" src="assets/duolingo-icon.webp" alt="">
+              <div class="promo-name">
+                <strong>Duolingo: Languages & C...</strong>
+                <div class="promo-meta">Duolingo <span aria-hidden="true">•</span> <span class="age-rating">3+</span> 4.7 <span class="rating-star">★</span></div>
+              </div>
+              <div class="install-wrap"><button class="install-button">Install</button><div class="purchase-note">In-app purchases</div></div>
+            </div>
+          </div>
+        </article>
+        <section class="suggested-section">
+          <div class="section-heading"><span class="sponsored-label">Sponsored</span><span class="heading-dot">•</span><h2>Suggested for you</h2><button class="more-button" aria-label="More suggested apps"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="4" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="10" cy="16" r="1.7"/></svg></button></div>
+          <div class="suggestions-viewport">
+            <article class="app-row jiji-row">
+              <img class="app-icon" src="assets/jiji-ethiopia.webp" alt="">
+              <div class="app-row-content"><h3 class="app-row-title">Jiji Ethiopia: Buy&Sell Online</h3><div class="app-row-sub">Shopping <span>•</span> Online marketplace</div><div class="app-row-meta"><span class="metric metric-pill">4.7 <b class="rating-star">★</b></span><span>49 MB</span></div></div>
+            </article>
+            <article class="app-row numero-row">
+              <img class="app-icon" src="assets/numero.webp" alt="">
+              <div class="app-row-content"><h3 class="app-row-title">Numero: Numbers & eSIM Data</h3><div class="app-row-sub">Communication <span>•</span> Calling apps</div><div class="app-row-meta"><span class="metric metric-pill">4.3 <b class="rating-star">★</b></span><span>49 MB</span></div></div>
+            </article>
+            <article class="app-row yango-row">
+              <img class="app-icon" src="assets/yango.webp" alt="">
+              <div class="app-row-content"><h3 class="app-row-title">Yango — different from a taxi</h3><div class="app-row-sub">Travel & local <span>•</span> Food & drink <span>•</span> Delivery</div><div class="app-row-meta"><span class="metric metric-pill">4.8 <b class="rating-star">★</b></span><span>78 MB</span><span>50m+</span></div></div>
+            </article>
+          </div>
+        </section>
+      </div>
+    </main>
+    <main class="feed explore-feed" id="explore-feed" aria-label="Explore" hidden>
+      <h1 class="explore-title">You might like</h1>
+      <section class="you-might-like" aria-label="Recommended app categories">
+        <div class="interest-card"><span>AI apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Video players</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Baseball apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Music player</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Coloring book apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Boating apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Karaoke apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+        <div class="interest-card"><span>Video chat apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+      </section>
+      <section class="explore-suggested">
+        <div class="section-heading"><span class="sponsored-label">Sponsored</span><span class="heading-dot">•</span><h2>Suggested for you</h2><button class="more-button" aria-label="More suggested apps"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="4" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="10" cy="16" r="1.7"/></svg></button></div>
+        <article class="yango-card"><img class="app-icon" src="assets/yango.webp" alt=""><div class="yango-info"><h3 class="app-row-title">Yango — different from a taxi</h3><div class="app-row-sub">Y Hub Zaf <span>•</span> Maps & Navigation</div><div class="app-row-meta"><span>4.8 <b class="rating-star">★</b></span><span>78 MB</span><span>⇩ 50m+</span></div></div></article>
+      </section>
+      <section class="explore-games">
+        <h2 class="explore-title">Explore games</h2>
+        <div class="game-grid">
+          <div class="game-card"><span>Action</span><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M8 16h25v13H8z" fill="#ff5475"/><path d="M17 12h10v4H17zM5 13h17v2H5zM31 14h10v2H31zM21 29v5m-8 0h17" stroke="#ff8ca1" stroke-width="2.6" stroke-linecap="round"/><path d="M33 18h7v7h-7z" fill="#e93661"/><path d="M4 20h5m-2.5-2.5v5" stroke="#ff8ca1" stroke-width="2"/></svg></div>
+          <div class="game-card"><span>Simulation</span><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M5 16 24 9l19 7v21H5V16Z" fill="#1c9f74"/><path d="M10 19h7v8h-7zm11-3h7v11h-7zm11 4h7v7h-7z" fill="#55d4a4"/><path d="M8 35h32" stroke="#5ee0b2" stroke-width="2"/><circle cx="24" cy="32" r="3" fill="#0d704f"/></svg></div>
+          <div class="game-card"><span>Puzzle</span><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M7 9h12c-1 5 1 8 5 8s6-3 5-8h12v12c-5-1-8 1-8 5s3 6 8 5v10H7V30c5 1 8-1 8-5s-3-6-8-5V9Z" fill="#00a6d9"/></svg></div>
+          <div class="game-card"><span>Adventure</span><svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx="24" cy="24" r="19" fill="#d8a93f"/><circle cx="24" cy="24" r="14" fill="#f4cf72"/><path d="m30 17-4 10-9 4 4-10 9-4Z" fill="#89621c"/><circle cx="24" cy="24" r="2" fill="#fff0b7"/></svg></div>
+        </div>
+      </section>
+    </main>
+    <nav class="bottom-tabs" role="tablist" aria-label="Main navigation">
+      <button class="nav-tab" id="tab-apps" role="tab" aria-selected="true" aria-controls="apps-feed">
+        <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg></span><span>Apps</span>
+      </button>
+      <button class="nav-tab" id="tab-explore" role="tab" aria-selected="false" aria-controls="explore-feed" tabindex="-1">
+        <span class="nav-icon-wrap"><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.8" stroke="currentColor" stroke-width="2.2"/><path d="m15.6 15.6 5 5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></span><span>Explore</span>
+      </button>
+    </nav>
+  </div>
+  <script>
+    (() => {
+      const phone = document.getElementById('phone');
+      const tabs = [...document.querySelectorAll('[role="tab"]')];
+      const appsHead = document.getElementById('apps-head');
+      const exploreHead = document.getElementById('explore-head');
+      const categories = document.getElementById('category-strip');
+      const appsFeed = document.getElementById('apps-feed');
+      const exploreFeed = document.getElementById('explore-feed');
+      function setTab(name, updateUrl = true) {
+        const isExplore = name === 'explore';
+        phone.dataset.tab = isExplore ? 'explore' : 'apps';
+        appsHead.hidden = isExplore;
+        exploreHead.style.display = isExplore ? 'flex' : 'none';
+        categories.hidden = isExplore;
+        appsFeed.hidden = isExplore;
+        exploreFeed.hidden = !isExplore;
+        tabs.forEach(tab => {
+          const selected = tab.id === `tab-${name}`;
+          tab.setAttribute('aria-selected', String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+        });
+        if (updateUrl) history.replaceState(null, '', isExplore ? '#explore' : '#apps');
+      }
+      tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => setTab(tab.id === 'tab-explore' ? 'explore' : 'apps'));
+        tab.addEventListener('keydown', event => {
+          if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+            setTab(next.id === 'tab-explore' ? 'explore' : 'apps');
+            next.focus();
+          }
+        });
+      });
+      window.addEventListener('hashchange', () => setTab(location.hash === '#explore' ? 'explore' : 'apps', false));
+      setTab(location.hash === '#explore' || new URLSearchParams(location.search).get('tab') === 'explore' ? 'explore' : 'apps', false);
+    })();
+  </script>
+</body>
+</html>
