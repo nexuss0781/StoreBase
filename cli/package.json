@@ -1,0 +1,22 @@
+{
+  "name": "storebase-app-publisher",
+  "version": "1.0.0",
+  "description": "Publish signed Android apps into a local StoreBase app-list catalog",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "commonjs",
+  "bin": {
+    "storebase-publish": "bin/storebase-publish.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

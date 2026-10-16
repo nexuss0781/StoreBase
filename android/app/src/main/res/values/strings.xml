@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">StoreBase</string>
+    <string name="title_activity_main">StoreBase</string>
+    <string name="package_name">com.nexuss0781.storebase</string>
+    <string name="custom_url_scheme">com.nexuss0781.storebase</string>
+</resources>

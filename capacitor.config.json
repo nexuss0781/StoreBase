@@ -1,0 +1,8 @@
+{
+  "appId": "com.nexuss0781.storebase",
+  "appName": "StoreBase",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}

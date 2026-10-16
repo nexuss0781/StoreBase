@@ -92,10 +92,10 @@
     .numero-row { --peek: linear-gradient(145deg,#fa2f47,#db0037); }
     .yango-row { --peek: linear-gradient(145deg,#1270d9,#1650b6); }
     .explore-title { margin: 0 0 12px; color: #e8eaed; font-size: 14px; line-height: 19px; font-weight: 500; }
-    .you-might-like { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3.5px; }
-    .interest-card { height: 61px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px 0 11px; border-radius: 10px; background: #202124; color: #e8eaed; font-size: 14px; line-height: 20px; font-weight: 500; }
-    .interest-card span { min-width: 0; }
-    .interest-card svg { width: 18px; height: 18px; flex: 0 0 18px; color: var(--blue); }
+    .category-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+    .category-card { min-width: 0; min-height: 78px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 12px; border-radius: 11px; background: #202124; color: #e8eaed; }
+    .category-name { display: block; font-size: 13px; line-height: 17px; font-weight: 600; }
+    .category-examples { display: block; color: #bdc1c6; font-size: 11px; line-height: 15px; }
     .explore-suggested { margin-top: 12.5px; }
     .explore-suggested .section-heading { margin-bottom: 12px; }
     .yango-card { min-height: 82px; display: flex; align-items: flex-start; gap: 14px; padding: 10px 10px 5px 10.5px; border-radius: 12px; background: #202124; }
@@ -192,16 +192,21 @@
       </div>
     </main>
     <main class="feed explore-feed" id="explore-feed" aria-label="Explore" hidden>
-      <h1 class="explore-title">You might like</h1>
-      <section class="you-might-like" aria-label="Recommended app categories">
-        <div class="interest-card"><span>AI apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Video players</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Baseball apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Music player</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Coloring book apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Boating apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Karaoke apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
-        <div class="interest-card"><span>Video chat apps</span><svg viewBox="0 0 24 24" fill="none"><circle cx="10.5" cy="10.5" r="6.5" stroke="currentColor" stroke-width="2.3"/><path d="m15.5 15.5 5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/></svg></div>
+      <h1 class="explore-title">Browse app categories</h1>
+      <section class="category-grid" aria-label="App categories">
+        <article class="category-card"><span class="category-name">Education</span><span class="category-examples">Learning apps, student portals</span></article>
+        <article class="category-card"><span class="category-name">Social</span><span class="category-examples">TikTok, Instagram</span></article>
+        <article class="category-card"><span class="category-name">Productivity</span><span class="category-examples">Notion, task managers</span></article>
+        <article class="category-card"><span class="category-name">Communication</span><span class="category-examples">Telegram, WhatsApp</span></article>
+        <article class="category-card"><span class="category-name">Entertainment</span><span class="category-examples">YouTube, Spotify</span></article>
+        <article class="category-card"><span class="category-name">Games</span><span class="category-examples">PUBG, Minecraft</span></article>
+        <article class="category-card"><span class="category-name">Business</span><span class="category-examples">CRM, accounting apps</span></article>
+        <article class="category-card"><span class="category-name">Shopping</span><span class="category-examples">Amazon, e-commerce apps</span></article>
+        <article class="category-card"><span class="category-name">Finance</span><span class="category-examples">Banking, mobile payments</span></article>
+        <article class="category-card"><span class="category-name">Utilities</span><span class="category-examples">File managers, calculators</span></article>
+        <article class="category-card"><span class="category-name">Health &amp; Fitness</span><span class="category-examples">Workout and health trackers</span></article>
+        <article class="category-card"><span class="category-name">Travel &amp; Navigation</span><span class="category-examples">Google Maps, booking apps</span></article>
+        <article class="category-card"><span class="category-name">AI &amp; Machine Learning</span><span class="category-examples">AI assistants, AI tools</span></article>
       </section>
       <section class="explore-suggested">
         <div class="section-heading"><span class="sponsored-label">Sponsored</span><span class="heading-dot">•</span><h2>Suggested for you</h2><button class="more-button" aria-label="More suggested apps"><svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="4" r="1.7"/><circle cx="10" cy="10" r="1.7"/><circle cx="10" cy="16" r="1.7"/></svg></button></div>
