@@ -1,12 +1,13 @@
 {
   "name": "storebase-app-publisher",
-  "version": "1.0.0",
-  "description": "Publish signed Android apps into a local StoreBase app-list catalog",
+  "version": "1.1.0",
+  "description": "Publish signed Android apps to a versioned Telegram-backed StoreBase catalog",
   "license": "UNLICENSED",
   "private": false,
   "type": "commonjs",
   "bin": {
-    "storebase-publish": "bin/storebase-publish.js"
+    "storebase-publish": "bin/storebase-publish.js",
+    "storebase-telegram": "bin/storebase-telegram.js"
   },
   "files": [
     "bin/",
@@ -15,6 +16,10 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "teleproto": "^1.230.1"
   },
   "scripts": {
     "test": "node --test"

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+require('dotenv').config();
+
 const { createInterface } = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 const {
@@ -10,9 +12,11 @@ const {
   validateInput,
   verifyApkSignature,
 } = require('../lib/publisher');
+const { connectTelegram, disconnectTelegram } = require('../lib/telegram-client');
+const { createTelegramStorage } = require('../lib/telegram-storage');
 
 const OPTION_NAMES = new Set([
-  'name', 'avatar', 'version', 'apk', 'category', 'description', 'keystore', 'alias', 'catalog', 'assets-dir',
+  'name', 'avatar', 'version', 'apk', 'category', 'description', 'keystore', 'alias', 'storage', 'catalog', 'assets-dir',
 ]);
 
 function parseArguments(args) {
@@ -34,7 +38,7 @@ function parseArguments(args) {
 }
 
 function showHelp() {
-  stdout.write(`StoreBase app publisher\n\nUsage:\n  storebase-publish [options]\n\nOptions (omitted values are prompted interactively):\n  --name <name>            App name\n  --avatar <file>          PNG, JPEG, or WebP avatar file\n  --version <version>      App version\n  --apk <file>             Signed Android APK\n  --category <category>    One of the 13 StoreBase categories\n  --description <text>     App description\n  --keystore <file>        Signing keystore used for the APK\n  --alias <name>           Private-key alias, if the keystore has multiple\n  --catalog <file>         App-list JSON (default: ./storebase-app-list.json)\n  --assets-dir <directory> Artifact directory (default: next to the catalog)\n  -h, --help               Show this help\n\nThe keystore password is entered in a hidden prompt, or read from\nSTOREBASE_KEYSTORE_PASSWORD for unattended use. It is never accepted as a CLI argument.\n`);
+  stdout.write(`StoreBase app publisher\n\nUsage:\n  storebase-publish [options]\n\nOptions (omitted values are prompted interactively):\n  --name <name>            App name\n  --avatar <file>          PNG, JPEG, or WebP avatar file\n  --version <version>      App version\n  --apk <file>             Signed Android APK\n  --category <category>    One of the 13 StoreBase categories\n  --description <text>     App description\n  --keystore <file>        Signing keystore used for the APK\n  --alias <name>           Private-key alias, if the keystore has multiple\n  --storage <backend>      telegram (default) or local\n  --catalog <file>         Local app-list JSON (local mode only)\n  --assets-dir <directory> Local artifact directory (local mode only)\n  -h, --help               Show this help\n\nTelegram configuration uses environment variables: STOREBASE_TELEGRAM_API_ID,\nSTOREBASE_TELEGRAM_API_HASH, STOREBASE_TELEGRAM_BOT_TOKEN, STOREBASE_TELEGRAM_SESSION,\nSTOREBASE_TELEGRAM_READ_SESSION, and STOREBASE_TELEGRAM_CHANNEL. The bot must be an administrator of the channel.\nThe keystore password is entered in a hidden prompt, or read from\nSTOREBASE_KEYSTORE_PASSWORD for unattended use. It is never accepted as a CLI argument.\n`);
 }
 
 function askHidden(label) {
@@ -144,6 +148,10 @@ async function main() {
   const parsed = parseArguments(process.argv.slice(2));
   if (parsed.help) return showHelp();
   const options = parsed.options;
+  options.storage = options.storage || 'telegram';
+  if (!['telegram', 'local'].includes(options.storage)) {
+    throw new Error('--storage must be either telegram or local.');
+  }
   const rawInput = await collectInput(options);
   const input = await validateInput(rawInput);
 
@@ -151,16 +159,35 @@ async function main() {
   const entries = await inspectKeystore(input.keystorePath, password);
   const entry = await selectEntry(entries, input.alias);
   const certificate = verifyApkSignature(input.apkPath, entry);
-  const result = await releaseApp(input, {
-    catalogPath: options.catalog,
-    assetsDir: options['assets-dir'],
-    signingCertificateSha256: certificate,
-  });
-
-  stdout.write(`\nRelease complete: ${result.app.name} ${result.app.version}\n`);
-  stdout.write(`App list: ${result.catalogPath}\n`);
-  stdout.write(`APK: ${result.app.apk}\n`);
-  stdout.write(`Avatar: ${result.app.avatar}\n`);
+  if (options.storage === 'local') {
+    const result = await releaseApp(input, {
+      catalogPath: options.catalog,
+      assetsDir: options['assets-dir'],
+      signingCertificateSha256: certificate,
+    });
+    stdout.write(`\nLocal release complete: ${result.app.name} ${result.app.version}\n`);
+    stdout.write(`App list: ${result.catalogPath}\n`);
+    stdout.write(`APK: ${result.app.apk}\n`);
+    stdout.write(`Avatar: ${result.app.avatar}\n`);
+  } else {
+    const connection = await connectTelegram();
+    try {
+      const storage = createTelegramStorage(connection.client, connection.channelEntity, {
+        readerClient: connection.readerClient,
+        readerChannel: connection.readerChannel,
+        writerChannel: connection.channelEntity,
+        channelRef: connection.channel,
+      });
+      const result = await storage.publish(input, certificate);
+      stdout.write(`\nTelegram release ${result.idempotent ? 'already exists' : 'published'}: ${input.name} ${input.version}\n`);
+      stdout.write(`Channel: ${connection.channel}\n`);
+      stdout.write(`Manifest message ID: ${result.messageId}\n`);
+      stdout.write(`APK message ID: ${result.manifest.artifacts.apk.messageId}\n`);
+      stdout.write(`Avatar message ID: ${result.manifest.artifacts.avatar.messageId}\n`);
+    } finally {
+      await disconnectTelegram(connection);
+    }
+  }
   stdout.write('The keystore was used only to verify the APK signature; it was not copied.\n');
 }
 
