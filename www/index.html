@@ -116,6 +116,14 @@
     .nav-tab[aria-selected="true"] { color: #8ab4f8; }
     .nav-tab[aria-selected="true"] .nav-icon-wrap { background: #006b91; color: #d3e3fd; }
     [hidden] { display: none !important; }
+    .update-dialog { width: min(440px, calc(100vw - 32px)); border: 1px solid #5f6368; border-radius: 20px; padding: 24px; background: #202124; color: #e8eaed; box-shadow: 0 12px 48px #0009; }
+    .update-dialog::backdrop { background: #0009; }
+    .update-dialog h2 { margin: 0 0 12px; font-size: 20px; }
+    .update-dialog p { margin: 0; color: #d3d6da; font-size: 14px; line-height: 1.5; white-space: pre-line; }
+    .update-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+    .update-dialog-actions button { min-height: 40px; padding: 0 16px; border-radius: 20px; background: transparent; color: #a8c7fa; font-weight: 600; }
+    .update-dialog-actions button.primary { background: #c2e7ff; color: #001d35; }
+    .update-dialog-actions button:disabled { opacity: .65; }
     @media (max-width: 340px) {
       .store-header { padding-right: 21px; padding-left: 21px; }
       .category-strip { padding-right: 14px; padding-left: 14px; }
@@ -231,6 +239,14 @@
       </button>
     </nav>
   </div>
+  <dialog class="update-dialog" id="update-dialog" aria-labelledby="update-title" aria-describedby="update-message">
+    <h2 id="update-title">Update available</h2>
+    <p id="update-message"></p>
+    <div class="update-dialog-actions">
+      <button id="update-later" type="button">Later</button>
+      <button class="primary" id="update-install" type="button">Install update</button>
+    </div>
+  </dialog>
   <script>
     (() => {
       const phone = document.getElementById('phone');
@@ -270,5 +286,6 @@
       setTab(location.hash === '#explore' || new URLSearchParams(location.search).get('tab') === 'explore' ? 'explore' : 'apps', false);
     })();
   </script>
+  <script type="module" src="./telegram-direct.js"></script>
 </body>
 </html>

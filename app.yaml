@@ -1,0 +1,7 @@
+kind: wasmer.io/App.v0
+owner: tadi0781
+name: storebase
+package: .
+capabilities:
+  database:
+    engine: postgres

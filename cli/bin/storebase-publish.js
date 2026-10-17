@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 'use strict';
 
-require('dotenv').config();
-
 const { createInterface } = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
+const { connectTelegramFromGateway } = require('../lib/gateway-client');
+const { getPublisherEnvironment } = require('../lib/publisher-token');
+const { loadProfileEntry } = require('../lib/signing-profiles');
+const { hidden } = require('../lib/secure-prompt');
 const {
   CATEGORIES,
   inspectKeystore,
@@ -17,6 +19,8 @@ const { createTelegramStorage } = require('../lib/telegram-storage');
 
 const OPTION_NAMES = new Set([
   'name', 'avatar', 'version', 'apk', 'category', 'description', 'keystore', 'alias', 'storage', 'catalog', 'assets-dir',
+  'telegram-config', 'signing-profile',
+  'android-version-code', 'minimum-android-version-code', 'delta', 'delta-base-version-code',
 ]);
 
 function parseArguments(args) {
@@ -38,44 +42,40 @@ function parseArguments(args) {
 }
 
 function showHelp() {
-  stdout.write(`StoreBase app publisher\n\nUsage:\n  storebase-publish [options]\n\nOptions (omitted values are prompted interactively):\n  --name <name>            App name\n  --avatar <file>          PNG, JPEG, or WebP avatar file\n  --version <version>      App version\n  --apk <file>             Signed Android APK\n  --category <category>    One of the 13 StoreBase categories\n  --description <text>     App description\n  --keystore <file>        Signing keystore used for the APK\n  --alias <name>           Private-key alias, if the keystore has multiple\n  --storage <backend>      telegram (default) or local\n  --catalog <file>         Local app-list JSON (local mode only)\n  --assets-dir <directory> Local artifact directory (local mode only)\n  -h, --help               Show this help\n\nTelegram configuration uses environment variables: STOREBASE_TELEGRAM_API_ID,\nSTOREBASE_TELEGRAM_API_HASH, STOREBASE_TELEGRAM_BOT_TOKEN, STOREBASE_TELEGRAM_SESSION,\nSTOREBASE_TELEGRAM_READ_SESSION, and STOREBASE_TELEGRAM_CHANNEL. The bot must be an administrator of the channel.\nThe keystore password is entered in a hidden prompt, or read from\nSTOREBASE_KEYSTORE_PASSWORD for unattended use. It is never accepted as a CLI argument.\n`);
+  stdout.write(`StoreBase app publisher
+
+Usage:
+  storebase-publish [options]
+
+Options (omitted app details are prompted interactively):
+  --name <name>                         App name
+  --avatar <file>                       PNG, JPEG, or WebP avatar file
+  --version <version>                   App version
+  --apk <file>                          Signed Android APK
+  --android-version-code <n>            Required for StoreBase Android releases
+  --minimum-android-version-code <n>    Optional required-upgrade floor
+  --delta <file.sbd>                    Optional StoreBase patch artifact
+  --delta-base-version-code <n>         Installed base code for the patch
+  --category <category>                 One of the 13 StoreBase categories
+  --description <text>                  App description
+  --signing-profile <profile>           Reuse a profile from storebase-keystore
+  --keystore <file>                     One-off signing keystore (no profile)
+  --alias <name>                        Private-key alias, if the keystore has multiple
+  --storage <backend>                   telegram (default) or local
+  --telegram-config <mode>              gateway (default) or local direct Telegram settings
+  --catalog <file>                      Local app-list JSON (local mode only)
+  --assets-dir <directory>              Local artifact directory (local mode only)
+  -h, --help                            Show this help
+
+Gateway mode uses STOREBASE_GATEWAY_URL (optional; defaults to the StoreBase gateway)
+and STOREBASE_GATEWAY_PUBLISH_TOKEN. The gateway sends encrypted Telegram settings
+to this run only; settings are decrypted in memory and are never written to disk.
+Use --telegram-config local only when supplying Telegram settings directly in the environment.
+The bot must be a channel administrator. Keystore passwords are entered in a hidden
+prompt or read from STOREBASE_KEYSTORE_PASSWORD.
+`);
 }
 
-function askHidden(label) {
-  if (!stdin.isTTY || typeof stdin.setRawMode !== 'function') {
-    return Promise.reject(new Error('Set STOREBASE_KEYSTORE_PASSWORD in the environment for non-interactive use.'));
-  }
-  return new Promise((resolve, reject) => {
-    let value = '';
-    let finished = false;
-    const cleanup = () => {
-      stdin.removeListener('data', onData);
-      try { stdin.setRawMode(false); } catch {}
-      stdin.pause();
-      stdout.write('\n');
-    };
-    const finish = (error) => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      if (error) reject(error);
-      else resolve(value);
-    };
-    const onData = (chunk) => {
-      for (const character of String(chunk)) {
-        if (character === '\u0003') return finish(new Error('Cancelled.'));
-        if (character === '\r' || character === '\n') return finish();
-        if (character === '\u007f' || character === '\b') value = value.slice(0, -1);
-        else if (character >= ' ') value += character;
-      }
-    };
-    stdout.write(`${label}: `);
-    stdin.setRawMode(true);
-    stdin.setEncoding('utf8');
-    stdin.resume();
-    stdin.on('data', onData);
-  });
-}
 
 async function collectInput(options) {
   const required = [
@@ -87,6 +87,7 @@ async function collectInput(options) {
     ['description', 'Description'],
     ['keystore', 'Signed keystore file path'],
   ];
+  if (options['signing-profile']) required.splice(required.findIndex(([key]) => key === 'keystore'), 1);
   const missing = required.filter(([key]) => !options[key]);
   if (missing.length && (!stdin.isTTY || !stdout.isTTY)) {
     throw new Error(`Missing required options: ${missing.map(([key]) => `--${key}`).join(', ')}. Prompts require an interactive terminal.`);
@@ -119,6 +120,10 @@ async function collectInput(options) {
     description: options.description,
     keystore: options.keystore,
     alias: options.alias,
+    androidVersionCode: options['android-version-code'],
+    minimumAndroidVersionCode: options['minimum-android-version-code'],
+    delta: options.delta,
+    deltaBaseVersionCode: options['delta-base-version-code'],
   };
 }
 
@@ -145,6 +150,7 @@ async function selectEntry(entries, aliasOption) {
 }
 
 async function main() {
+  require('dotenv').config();
   const parsed = parseArguments(process.argv.slice(2));
   if (parsed.help) return showHelp();
   const options = parsed.options;
@@ -152,14 +158,26 @@ async function main() {
   if (!['telegram', 'local'].includes(options.storage)) {
     throw new Error('--storage must be either telegram or local.');
   }
+  options['telegram-config'] = options['telegram-config'] || 'gateway';
+  if (!['gateway', 'local'].includes(options['telegram-config'])) {
+    throw new Error('--telegram-config must be either gateway or local.');
+  }
+  if (options['signing-profile'] && (options.keystore || options.alias)) {
+    throw new Error('--signing-profile cannot be combined with --keystore or --alias.');
+  }
   const rawInput = await collectInput(options);
-  const input = await validateInput(rawInput);
-
-  const password = process.env.STOREBASE_KEYSTORE_PASSWORD ?? await askHidden('Keystore password (input hidden)');
-  const entries = await inspectKeystore(input.keystorePath, password);
-  const entry = await selectEntry(entries, input.alias);
+  let entry = options['signing-profile'] ? await loadProfileEntry(options['signing-profile']) : undefined;
+  const input = await validateInput(rawInput, { signingProfile: entry });
+  if (!entry) {
+    let password = process.env.STOREBASE_KEYSTORE_PASSWORD ?? await hidden('Keystore password');
+    try { entry = await selectEntry(await inspectKeystore(input.keystorePath, password), input.alias); }
+    finally { password = ''; }
+  }
   const certificate = verifyApkSignature(input.apkPath, entry);
   if (options.storage === 'local') {
+    if (input.androidVersionCode !== undefined || input.deltaPath) {
+      throw new Error('StoreBase Android update metadata and delta artifacts must be published through Telegram storage.');
+    }
     const result = await releaseApp(input, {
       catalogPath: options.catalog,
       assetsDir: options['assets-dir'],
@@ -170,7 +188,9 @@ async function main() {
     stdout.write(`APK: ${result.app.apk}\n`);
     stdout.write(`Avatar: ${result.app.avatar}\n`);
   } else {
-    const connection = await connectTelegram();
+    const connection = options['telegram-config'] === 'local'
+      ? await connectTelegram()
+      : await connectTelegramFromGateway(await getPublisherEnvironment());
     try {
       const storage = createTelegramStorage(connection.client, connection.channelEntity, {
         readerClient: connection.readerClient,
@@ -184,14 +204,17 @@ async function main() {
       stdout.write(`Manifest message ID: ${result.messageId}\n`);
       stdout.write(`APK message ID: ${result.manifest.artifacts.apk.messageId}\n`);
       stdout.write(`Avatar message ID: ${result.manifest.artifacts.avatar.messageId}\n`);
+      if (result.manifest.artifacts.delta) stdout.write(`Delta message ID: ${result.manifest.artifacts.delta.messageId}\n`);
     } finally {
       await disconnectTelegram(connection);
     }
   }
-  stdout.write('The keystore was used only to verify the APK signature; it was not copied.\n');
+  stdout.write('APK signing certificate verified. No keystore or signing passwords were uploaded.\n');
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   process.stderr.write(`storebase-publish: ${error.message}\n`);
   process.exitCode = 1;
 });
+
+module.exports = { parseArguments, collectInput };

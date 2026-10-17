@@ -1,18 +1,24 @@
 {
-  "name": "storebase-app-publisher",
-  "version": "1.1.0",
+  "name": "storebase-cli",
+  "version": "1.3.0",
   "description": "Publish signed Android apps to a versioned Telegram-backed StoreBase catalog",
   "license": "UNLICENSED",
   "private": false,
   "type": "commonjs",
   "bin": {
     "storebase-publish": "bin/storebase-publish.js",
-    "storebase-telegram": "bin/storebase-telegram.js"
+    "storebase-telegram": "bin/storebase-telegram.js",
+    "storebase-keystore": "bin/storebase-keystore.js",
+    "storebase-skill": "bin/storebase-skill.js"
   },
   "files": [
-    "bin/",
-    "lib/",
-    "README.md"
+    "bin/*.js",
+    "lib/*.js",
+    "README.md",
+    "skills/storebase/SKILL.md",
+    "skills/storebase/references/cli-workflows.md",
+    "skills/storebase/references/runtime-and-android.md",
+    "skills/storebase/references/updates-and-development.md"
   ],
   "engines": {
     "node": ">=18"

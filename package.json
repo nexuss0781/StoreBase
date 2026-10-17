@@ -1,18 +1,25 @@
 {
   "name": "storebase",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Apps & Explore two-tab app packaged with Capacitor",
   "scripts": {
-    "build": "mkdir -p www && cp index.html www/index.html",
+    "build": "mkdir -p www && cp index.html www/index.html && vite build --config vite.config.mjs",
+    "start": "node gateway/server.js",
+    "test": "node --test gateway/test/*.test.js cli/test/*.test.js && python3 -m unittest discover -s tools -p 'test_*.py'",
     "android:sync": "npm run build && cap sync android",
     "android:build": "npm run android:sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
-    "@capacitor/core": "^8.5.3"
+    "@capacitor/core": "^8.5.3",
+    "dotenv": "^16.4.7",
+    "teleproto": "^1.230.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.3"
+    "@capacitor/cli": "^8.5.3",
+    "@mtcute/convert": "^0.32.5",
+    "@mtcute/web": "^0.32.5",
+    "vite": "^8.3.4"
   }
 }

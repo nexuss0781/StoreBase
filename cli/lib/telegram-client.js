@@ -58,6 +58,55 @@ async function disconnectTelegram(connection) {
   await Promise.allSettled(clients.map((client) => client.disconnect()));
 }
 
+async function disconnectTelegramReader(connection) {
+  if (!connection?.client) return;
+  await Promise.allSettled([connection.client.disconnect()]);
+}
+
+function readTelegramReaderConfig(env = process.env) {
+  const apiIdText = env.STOREBASE_TELEGRAM_API_ID;
+  const apiHash = env.STOREBASE_TELEGRAM_API_HASH;
+  const readSession = env.STOREBASE_TELEGRAM_READ_SESSION;
+  const channelValue = env.STOREBASE_TELEGRAM_CHANNEL;
+  const apiId = Number(apiIdText);
+  if (!apiIdText || !Number.isSafeInteger(apiId) || apiId <= 0) {
+    fail('Set STOREBASE_TELEGRAM_API_ID to the Telegram application API ID.');
+  }
+  if (typeof apiHash !== 'string' || !apiHash.trim()) {
+    fail('Set STOREBASE_TELEGRAM_API_HASH to the Telegram application API hash.');
+  }
+  if (typeof readSession !== 'string' || !readSession.trim()) {
+    fail('Set STOREBASE_TELEGRAM_READ_SESSION to an authorized personal MTProto StringSession with read access to the channel.');
+  }
+  if (!channelValue || !String(channelValue).trim()) {
+    fail('Set STOREBASE_TELEGRAM_CHANNEL to the target channel username or channel ID.');
+  }
+  return { apiId, apiHash: apiHash.trim(), readSession: readSession.trim(), channel: String(channelValue).trim() };
+}
+
+async function connectTelegramReader(env = process.env) {
+  const config = readTelegramReaderConfig(env);
+  const { TelegramClient } = require('teleproto');
+  const { StringSession } = require('teleproto/sessions');
+  const client = createClient(StringSession, TelegramClient, config.readSession, config);
+  try {
+    await client.connect();
+    if (!await client.checkAuthorization()) {
+      fail('STOREBASE_TELEGRAM_READ_SESSION is not authorized. Supply a valid user StringSession with access to the StoreBase channel.');
+    }
+    if (typeof client.isBot === 'function' && await client.isBot()) {
+      fail('STOREBASE_TELEGRAM_READ_SESSION must be a personal user session. Bot sessions cannot read channel history.');
+    }
+    const channelEntity = await client.getEntity(config.channel);
+    requireBroadcastChannel(channelEntity, 'STOREBASE_TELEGRAM_CHANNEL as seen by the reader session');
+    await client.getMessages(channelEntity, { limit: 1 });
+    return { client, channelEntity, channel: config.channel };
+  } catch (error) {
+    await disconnectTelegramReader({ client });
+    throw error;
+  }
+}
+
 async function connectTelegram(env = process.env, options = {}) {
   const config = readTelegramConfig(env, options);
   const { TelegramClient } = require('teleproto');
@@ -119,4 +168,11 @@ async function connectTelegram(env = process.env, options = {}) {
   }
 }
 
-module.exports = { connectTelegram, disconnectTelegram, readTelegramConfig };
+module.exports = {
+  connectTelegram,
+  connectTelegramReader,
+  disconnectTelegram,
+  disconnectTelegramReader,
+  readTelegramConfig,
+  readTelegramReaderConfig,
+};

@@ -5,8 +5,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { gzipSync } = require('node:zlib');
 const { validateInput } = require('../lib/publisher');
-const { readTelegramConfig } = require('../lib/telegram-client');
+const { readTelegramConfig, readTelegramReaderConfig } = require('../lib/telegram-client');
 const {
   MANIFEST_FORMAT,
   MANIFEST_MARKER,
@@ -96,6 +97,20 @@ test('reads Telegram settings without exposing secrets and accepts a saved bot s
   assert.throws(() => readTelegramConfig({ STOREBASE_TELEGRAM_API_ID: '12345', STOREBASE_TELEGRAM_API_HASH: 'x', STOREBASE_TELEGRAM_BOT_TOKEN: 'y', STOREBASE_TELEGRAM_CHANNEL: '@x' }), /READ_SESSION/);
 });
 
+test('read-only gateway configuration needs a Telegram reader session but no bot credentials', () => {
+  const config = readTelegramReaderConfig({
+    STOREBASE_TELEGRAM_API_ID: '12345',
+    STOREBASE_TELEGRAM_API_HASH: 'api-hash',
+    STOREBASE_TELEGRAM_READ_SESSION: 'read-session',
+    STOREBASE_TELEGRAM_CHANNEL: '@StoreBaseApps',
+  });
+  assert.equal(config.apiId, 12345);
+  assert.equal(config.channel, '@StoreBaseApps');
+  assert.equal(config.readSession, 'read-session');
+  assert.equal(Object.hasOwn(config, 'botToken'), false);
+  assert.throws(() => readTelegramReaderConfig({ STOREBASE_TELEGRAM_API_ID: '12345', STOREBASE_TELEGRAM_API_HASH: 'x', STOREBASE_TELEGRAM_CHANNEL: '@x' }), /READ_SESSION/);
+});
+
 test('publishes a structured versioned manifest, keeps releases immutable, and downloads verified artifacts', async (t) => {
   const f = await fixture(t);
   const first = await f.storage.publish(f.input, CERT, { publishedAt: '2026-01-01T00:00:00.000Z' });
@@ -152,4 +167,100 @@ test('rejects manifest identifiers that could escape the download directory', ()
     },
   };
   assert.throws(() => parseManifestMessage({ id: 44, message: `${MANIFEST_MARKER}\n${JSON.stringify(manifest)}` }), /unsafe app ID or version/);
+});
+
+test('publishes and downloads an Android delta directly as a Telegram versioned artifact', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'storebase-delta-test-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const avatar = path.join(root, 'icon.png');
+  const apk = path.join(root, 'storebase.apk');
+  const delta = path.join(root, 'v1-to-v2.sbd');
+  const keystore = path.join(root, 'release.jks');
+  const patchBytes = gzipSync(Buffer.from('SBD1 deterministic patch fixture'));
+  await Promise.all([
+    fs.writeFile(avatar, PNG), fs.writeFile(apk, APK), fs.writeFile(delta, patchBytes), fs.writeFile(keystore, 'keystore placeholder'),
+  ]);
+  const input = await validateInput({
+    name: 'StoreBase', avatar, version: '1.1.0', apk, category: 'Utilities', description: 'StoreBase app.', keystore,
+    androidVersionCode: '2', minimumAndroidVersionCode: '0', delta, deltaBaseVersionCode: '1',
+  });
+  const writer = new FakeTelegramClient();
+  const reader = new FakeTelegramClient();
+  reader.messages = writer.messages;
+  const storage = createTelegramStorage(writer, '@StoreBaseTest', { readerClient: reader });
+
+  const published = await storage.publish(input, CERT, { publishedAt: '2026-03-01T00:00:00.000Z' });
+  assert.deepEqual(published.manifest.androidUpdate, {
+    packageName: 'com.nexuss0781.storebase', versionCode: 2, minimumVersionCode: 0,
+  });
+  assert.equal(published.manifest.artifacts.delta.fromVersionCode, 1);
+  assert.equal(published.manifest.artifacts.delta.messageId > 0, true);
+  assert.equal(writer.messages.at(-1).message.startsWith(`${MANIFEST_MARKER}\n`), true);
+
+  const downloaded = await storage.download('storebase', '1.1.0', 'delta', path.join(root, 'downloaded'));
+  assert.equal(downloaded.downloaded.length, 1);
+  assert.equal(downloaded.downloaded[0].kind, 'delta');
+  assert.deepEqual(await fs.readFile(downloaded.downloaded[0].path), patchBytes);
+  assert.equal(parseManifestMessage(writer.messages.at(-1)).manifest.androidUpdate.versionCode, 2);
+});
+
+test("requires a signed update manifest's StoreBase version code and matching delta base", async (t) => {
+  const f = await fixture(t);
+  await assert.rejects(validateInput({
+    name: 'StoreBase', avatar: f.avatar, version: '1.1.0', apk: f.apk,
+    category: 'Utilities', description: 'StoreBase app.', keystore: f.keystore,
+  }), /require --android-version-code/);
+  const delta = path.join(f.root, 'bad.sbd');
+  await fs.writeFile(delta, gzipSync(Buffer.from('fixture')));
+  await assert.rejects(validateInput({
+    name: 'StoreBase', avatar: f.avatar, version: '1.1.0', apk: f.apk,
+    category: 'Utilities', description: 'StoreBase app.', keystore: f.keystore,
+    androidVersionCode: '2', delta, deltaBaseVersionCode: '2',
+  }), /lower than --android-version-code/);
+});
+
+
+test('lists every Telegram version and resolves the pinned default independently of immutable manifests', async (t) => {
+  const f = await fixture(t);
+  await f.storage.publish(f.input, CERT, { publishedAt: '2026-01-01T00:00:00.000Z' });
+  const nextApk = path.join(f.root, 'release-1.1.apk');
+  await fs.writeFile(nextApk, Buffer.concat([APK, Buffer.from('v1.1')]));
+  await f.storage.publish({ ...f.input, version: '1.1.0', apkPath: nextApk }, CERT, { publishedAt: '2026-02-01T00:00:00.000Z' });
+
+  let catalog = await f.storage.getCatalog();
+  assert.equal(catalog[0].defaultVersion, '1.1.0');
+  assert.equal(catalog[0].defaultPinned, false);
+  assert.deepEqual(catalog[0].versions.map(({ manifest }) => manifest.version), ['1.1.0', '1.0.0']);
+  assert.equal((await f.storage.getMetadata('example-app')).manifest.version, '1.1.0');
+
+  const pin = await f.storage.pinVersion('example-app', '1.0.0');
+  assert.equal(pin.idempotent, false);
+  assert.equal(f.client.messages.at(-1).message.startsWith('STOREBASE_DEFAULT_VERSION_V1\n'), true);
+  catalog = await f.storage.getCatalog();
+  assert.equal(catalog[0].defaultVersion, '1.0.0');
+  assert.equal(catalog[0].defaultPinned, true);
+  assert.equal(catalog[0].pinnedAt, pin.record.pinnedAt);
+  assert.equal((await f.storage.getMetadata('example-app')).manifest.version, '1.0.0');
+
+  const samePin = await f.storage.pinVersion('example-app', '1.0.0');
+  assert.equal(samePin.idempotent, true);
+  assert.equal(samePin.messageId, pin.messageId);
+  await assert.rejects(f.storage.pinVersion('example-app', '9.9.9'), /No Telegram release found/);
+});
+
+test('parses only well-formed Telegram default-version records', () => {
+  const { parseDefaultVersionMessage } = require('../lib/telegram-storage');
+  assert.equal(parseDefaultVersionMessage({ id: 1, message: 'ordinary post' }), null);
+  const record = {
+    format: 'storebase.default-version',
+    schemaVersion: 1,
+    appId: 'example-app',
+    version: '1.2.3',
+    pinnedAt: '2026-04-01T00:00:00.000Z',
+  };
+  const parsed = parseDefaultVersionMessage({ id: 2, message: `STOREBASE_DEFAULT_VERSION_V1\n${JSON.stringify(record)}` });
+  assert.equal(parsed.record.version, '1.2.3');
+  assert.equal(parsed.messageId, 2);
+  record.appId = '../bad';
+  assert.throws(() => parseDefaultVersionMessage({ id: 3, message: `STOREBASE_DEFAULT_VERSION_V1\n${JSON.stringify(record)}` }), /invalid/);
 });

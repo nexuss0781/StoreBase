@@ -13,9 +13,6 @@ const { createReadStream } = require('node:fs');
 const { createHash, randomBytes } = require('node:crypto');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { createInterface } = require('node:readline/promises');
-const { stdin, stdout } = require('node:process');
-const { tmpdir } = require('node:os');
 
 const CATEGORIES = Object.freeze([
   'Education',
@@ -89,6 +86,23 @@ async function validateInput(raw, options = {}) {
   if (!/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/.test(version)) {
     fail('Version is required and must be 1–64 safe characters (letters, numbers, dot, plus, underscore, or hyphen).');
   }
+  const id = slugify(name);
+  const androidVersionCode = raw.androidVersionCode === undefined || raw.androidVersionCode === ''
+    ? undefined : Number(raw.androidVersionCode);
+  const minimumAndroidVersionCode = raw.minimumAndroidVersionCode === undefined || raw.minimumAndroidVersionCode === ''
+    ? 0 : Number(raw.minimumAndroidVersionCode);
+  if (id === 'storebase' && !Number.isSafeInteger(androidVersionCode)) {
+    fail('StoreBase Telegram releases require --android-version-code.');
+  }
+  if (id !== 'storebase' && androidVersionCode !== undefined) {
+    fail('Android updater version metadata is reserved for the StoreBase app ID.');
+  }
+  if ((androidVersionCode !== undefined && (!Number.isSafeInteger(androidVersionCode) || androidVersionCode <= 0 || androidVersionCode > 2147483647))
+      || !Number.isSafeInteger(minimumAndroidVersionCode) || minimumAndroidVersionCode < 0
+      || (androidVersionCode === undefined && minimumAndroidVersionCode !== 0)
+      || (androidVersionCode !== undefined && minimumAndroidVersionCode > androidVersionCode)) {
+    fail('Android version codes must be valid positive integers and the minimum cannot exceed the release code.');
+  }
 
   const description = typeof raw.description === 'string' ? raw.description.trim() : '';
   if (!description) fail('Description is required.');
@@ -110,10 +124,35 @@ async function validateInput(raw, options = {}) {
   } finally {
     await apkHandle.close();
   }
-  const keystorePath = await requireFile(raw.keystore, 'Signed keystore file', cwd);
+  let deltaPath;
+  let deltaBaseVersionCode;
+  if (raw.delta) {
+    if (id !== 'storebase') fail('Telegram delta artifacts are currently supported only for the StoreBase Android app.');
+    if (!Number.isSafeInteger(androidVersionCode)) fail('A StoreBase delta requires --android-version-code.');
+    deltaBaseVersionCode = Number(raw.deltaBaseVersionCode);
+    if (!Number.isSafeInteger(deltaBaseVersionCode) || deltaBaseVersionCode <= 0 || deltaBaseVersionCode >= androidVersionCode) {
+      fail('--delta-base-version-code must be a positive version lower than --android-version-code.');
+    }
+    deltaPath = await requireFile(raw.delta, 'Delta patch file', cwd);
+    if (path.extname(deltaPath).toLowerCase() !== '.sbd') fail('Delta patch file must have the .sbd extension.');
+    const patchFile = await require('node:fs/promises').open(deltaPath, 'r');
+    try {
+      const patchHeader = Buffer.alloc(2);
+      const { bytesRead } = await patchFile.read(patchHeader, 0, 2, 0);
+      if (bytesRead !== 2 || patchHeader[0] !== 0x1f || patchHeader[1] !== 0x8b) {
+        fail('Delta patch must be a gzip-compressed SBD file.');
+      }
+    } finally {
+      await patchFile.close();
+    }
+  } else if (raw.deltaBaseVersionCode !== undefined && raw.deltaBaseVersionCode !== '') {
+    fail('--delta-base-version-code requires --delta.');
+  }
+  if (options.signingProfile && (!/^[A-F0-9]{64}$/.test(options.signingProfile.fingerprint) || typeof options.signingProfile.alias !== 'string' || !options.signingProfile.alias)) fail('Invalid signing profile certificate.');
+  const keystorePath = options.signingProfile ? undefined : await requireFile(raw.keystore, 'Signed keystore file', cwd);
 
   return {
-    id: slugify(name),
+    id,
     name,
     avatarPath,
     avatarExtension,
@@ -123,6 +162,10 @@ async function validateInput(raw, options = {}) {
     description,
     keystorePath,
     alias: typeof raw.alias === 'string' && raw.alias.trim() ? raw.alias.trim() : undefined,
+    androidVersionCode,
+    minimumAndroidVersionCode,
+    deltaPath,
+    deltaBaseVersionCode,
   };
 }
 
@@ -159,35 +202,31 @@ function parseApkSignerFingerprints(output) {
 }
 
 async function inspectKeystore(keystorePath, password) {
-  if (typeof password !== 'string') fail('A keystore password is required to verify the signing certificate.');
-  if (password.includes('\n') || password.includes('\r')) fail('Keystore passwords cannot contain line breaks.');
-  const fs = require('node:fs');
-  const folder = await require('node:fs/promises').mkdtemp(path.join(tmpdir(), 'storebase-keystore-'));
-  const passwordFile = path.join(folder, 'password');
+  if (typeof password !== 'string' || /[\r\n\0]/.test(password)) fail('A valid keystore password is required.');
   try {
-    await writeFile(passwordFile, `${password}\n`, { mode: 0o600, flag: 'wx' });
     const output = runTool('keytool', [
-      '-J-Duser.language=en',
-      '-J-Duser.country=US',
-      '-list',
-      '-v',
-      '-keystore',
-      keystorePath,
-      '-storepass:file',
-      passwordFile,
-    ]);
+      '-J-Duser.language=en', '-J-Duser.country=US', '-list', '-v',
+      '-keystore', keystorePath, '-storepass:env', 'STOREBASE_KEYTOOL_STORE_PASSWORD',
+    ], { env: { ...process.env, LC_ALL: 'C', LANG: 'C', STOREBASE_KEYTOOL_STORE_PASSWORD: password } });
     const entries = parseKeystoreEntries(output);
-    if (!entries.length) fail('The keystore has no readable private-key entry with a SHA-256 certificate.');
+    if (!entries.length) fail('No private-key certificate found.');
     return entries;
-  } finally {
-    // Best-effort overwrite before removal; the temporary directory is private (0700).
-    try {
-      const fd = fs.openSync(passwordFile, 'r+');
-      const size = fs.fstatSync(fd).size;
-      fs.writeSync(fd, Buffer.alloc(size));
-      fs.closeSync(fd);
-    } catch {}
-    await rm(folder, { recursive: true, force: true });
+  } catch {
+    fail('Could not inspect keystore. Check the password, file format, and Java keytool installation.');
+  }
+}
+
+async function verifyKeystoreKeyPassword(keystorePath, storePassword, alias, keyPassword) {
+  if (typeof keyPassword !== 'string' || /[\r\n\0]/.test(keyPassword)) fail('A valid private-key password is required.');
+  try {
+    runTool('keytool', [
+      '-J-Duser.language=en', '-J-Duser.country=US', '-certreq', '-keystore', keystorePath,
+      '-alias', alias, '-storepass:env', 'STOREBASE_KEYTOOL_STORE_PASSWORD',
+      '-keypass:env', 'STOREBASE_KEYTOOL_KEY_PASSWORD',
+    ], { env: { ...process.env, LC_ALL: 'C', LANG: 'C', STOREBASE_KEYTOOL_STORE_PASSWORD: storePassword,
+      STOREBASE_KEYTOOL_KEY_PASSWORD: keyPassword } });
+  } catch {
+    fail('Could not unlock the private key. Check its password and alias.');
   }
 }
 
@@ -345,4 +384,5 @@ module.exports = {
   validateInput,
   verifyApkSignature,
   inspectKeystore,
+  verifyKeystoreKeyPassword,
 };
